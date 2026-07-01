@@ -15,6 +15,10 @@ electrophysiology/src/CellModel/build
 electrophysiology/src/LatticePETSc/build
 mechanics/build
 build
+_build
+
+# machine-local CMake presets
+CMakeUserPresets.json
 
 # binaries
 bin
