@@ -1,9 +1,15 @@
 import os
+import shutil
 from pathlib import Path
 
 import pytest
 
 REPO_ROOT = Path(__file__).resolve().parents[1]
+
+# EM01 short-run milestones (full 1.0s beat is ~30+ min; these capture the
+# physics of interest): EP wavefront reaches the far sensor P8 at ~42ms, first
+# clear mechanical deformation appears by ~30ms. 0.05s covers both with buffer.
+EM01_SIM_LENGTH = 0.05
 
 
 def pytest_addoption(parser):
@@ -64,3 +70,46 @@ def _find_binary(name):
 def binary():
     """Return a resolver: binary('CellModelTest') -> Path to the newest build."""
     return _find_binary
+
+
+@pytest.fixture(scope="session")
+def em01_sim_length():
+    return EM01_SIM_LENGTH
+
+
+@pytest.fixture(scope="session")
+def em01_root(binary, cm_env, tmp_path_factory):
+    """Stage the EM01 example into an isolated tree and run the FE-matrix
+    preprocessing once. Shared by the BidomainMatrixGenerator, acCELLerate and
+    full-EM (CardioMechanics M_1mm) tests, which all consume its output.
+
+    Requires mpirun for the downstream parallel runs; the preprocessing itself
+    is serial. The staged ep_0.25mm.aclt is shortened to EM01_SIM_LENGTH.
+    """
+    from helpers.run import run_binary
+
+    if shutil.which("mpirun") is None:
+        pytest.skip("mpirun not found")
+
+    src = REPO_ROOT / "examples" / "EM01"
+    root = tmp_path_factory.mktemp("em01")
+    for sub in ["settings", "tetgen", "cellmodelFiles", "stimFiles", "sensorFiles", "materialFiles"]:
+        shutil.copytree(src / sub, root / sub)
+    (root / "geoFiles").mkdir()
+    shutil.copy(src / "geoFiles" / "cube_0.25mm.vtu", root / "geoFiles")
+    (root / "Results" / "EP").mkdir(parents=True)
+
+    # Preprocessing: assemble mono-domain stiffness/mass matrices and material vec.
+    run_binary(
+        binary("BidomainMatrixGenerator"),
+        ["cube_0.25mm.vtu", "-o", "cube_0.25mm", "-mono", "../materialFiles/materialIntra.def"],
+        cwd=root / "geoFiles",
+        env=cm_env,
+        timeout=300,
+    )
+
+    # Shorten the EP project length in place (affects both the standalone
+    # acCELLerate run and the plugin used by the coupled EM run).
+    aclt = root / "settings" / "ep_0.25mm.aclt"
+    aclt.write_text(aclt.read_text().replace("CalcLength 1.0", f"CalcLength {EM01_SIM_LENGTH}"))
+    return root

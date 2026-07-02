@@ -5,14 +5,27 @@ runs a binary on a fixed input and compares its output to a committed reference
 with numerical tolerances (never byte-exact). See `REGRESSION_PLAN.md` for the
 full design and rollout.
 
-Coverage so far:
+Coverage:
 - **CellModelTest** — all runnable single-cell ionic models (auto-discovered),
   plus coupled ionic+tension runs for Land17. Serial.
 - **CardioMechanics** — benchmark2015 Problem1 (Static solver) at `mpirun -np 4`:
   the `Pressure.dat` time series and the final deformed geometry (last VTU point
   coordinates, via meshio). Marked `mpi`.
+- **BidomainMatrixGenerator** — assembles the EM01 mono-domain matrices (serial)
+  and compares structural/numeric invariants (dims, nnz, Frobenius norm, sums)
+  of the stiffness/mass matrices and material vector, read directly from the
+  PETSc binary format (no petsc4py needed).
+- **acCELLerate** — standalone EP solve on the EM01 cube at `mpirun -np 4`;
+  compares the P8 sensor traces (Vm, Cai). Marked `mpi slow`.
+- **CardioMechanics EM01** — full electromechanics (`NewmarkBeta` solver +
+  acCELLerate plugin + Land17) at `mpirun -np 4`; compares final deformation and
+  the coupled P8 sensor traces. Marked `mpi slow`.
 
-Planned: EM01 full electromechanical run, BidomainMatrixGenerator, acCELLerate.
+The three EM01 tests share one staged tree and a single matrix-assembly step
+(the `em01_root` fixture). The EM01 electromechanics runs are shortened to
+`EM01_SIM_LENGTH` (0.05 s) — the full 1 s beat is ~30+ min; 0.05 s still captures
+the wavefront reaching the far sensor P8 (~42 ms) and the first clear mechanical
+deformation (~30 ms).
 
 ## Setup
 

@@ -45,6 +45,60 @@ def read_table(path):
     return names, data
 
 
+def read_headerless(path, names):
+    """Load a whitespace numeric table that has no header line (e.g. acCELLerate
+    sensor files: `t value` per row). Returns (names, data)."""
+    data = np.loadtxt(str(path))
+    if data.ndim == 1:
+        data = data.reshape(1, -1)
+    assert data.shape[1] == len(names), (
+        f"{path}: expected {len(names)} columns but found {data.shape[1]}"
+    )
+    return list(names), data
+
+
+def read_petsc_mat(path):
+    """Structural/numeric invariants of a PETSc binary sparse matrix.
+
+    Format (big-endian): int32 classid(1211216), rows, cols, nnz;
+    int32 row_lengths[rows]; int32 col_indices[nnz]; float64 values[nnz].
+    Returns dict(rows, cols, nnz, fro, vsum) — avoids committing the (large)
+    matrix or a PETSc-version-fragile byte comparison.
+    """
+    with open(str(path), "rb") as f:
+        classid, rows, cols, nnz = (int(x) for x in np.fromfile(f, dtype=">i4", count=4))
+        assert classid == 1211216, f"{path}: not a PETSc matrix (classid {classid})"
+        rowlen = np.fromfile(f, dtype=">i4", count=rows)
+        np.fromfile(f, dtype=">i4", count=nnz)  # column indices (skip)
+        val = np.fromfile(f, dtype=">f8", count=nnz)
+    assert int(rowlen.sum()) == nnz and len(val) == nnz, f"{path}: truncated/inconsistent"
+    return {"rows": rows, "cols": cols, "nnz": nnz,
+            "fro": float(np.sqrt((val ** 2).sum())), "vsum": float(val.sum())}
+
+
+def read_petsc_vec(path):
+    """Invariants of a PETSc binary vector: dict(n, l2, vsum)."""
+    with open(str(path), "rb") as f:
+        classid, n = (int(x) for x in np.fromfile(f, dtype=">i4", count=2))
+        assert classid == 1211214, f"{path}: not a PETSc vector (classid {classid})"
+        val = np.fromfile(f, dtype=">f8", count=n)
+    return {"n": n, "l2": float(np.sqrt((val ** 2).sum())), "vsum": float(val.sum())}
+
+
+def compare_scalars(actual, golden, rtol, atol=0.0):
+    """Assert two dicts of scalars match. Integer-valued keys (dims, counts)
+    must match exactly; floats compare within tolerance."""
+    assert set(actual) == set(golden), f"keys differ: {set(actual)} vs {set(golden)}"
+    for k in golden:
+        a, g = actual[k], golden[k]
+        if isinstance(g, int):
+            assert a == g, f"'{k}' changed: actual={a} golden={g}"
+        elif not np.isclose(a, g, rtol=rtol, atol=atol):
+            raise AssertionError(
+                f"'{k}' differs beyond rtol={rtol} atol={atol}: actual={a:.8e} golden={g:.8e}"
+            )
+
+
 def read_vtu_points(path):
     """Deformed point coordinates from a VTU, ordered by PointID.
 
