@@ -27,6 +27,44 @@ def read_trace(path):
     return names, data
 
 
+def read_table(path):
+    """Parse a whitespace-delimited table whose first line is plain column names.
+
+    Used for outputs like CardioMechanics Pressure.dat
+    (`time pressure130 volume130`). Returns (names, data).
+    """
+    path = str(path)
+    with open(path) as f:
+        names = f.readline().split()
+    data = np.loadtxt(path, skiprows=1)
+    if data.ndim == 1:
+        data = data.reshape(1, -1)
+    assert data.shape[1] == len(names), (
+        f"{path}: {len(names)} header columns but {data.shape[1]} data columns"
+    )
+    return names, data
+
+
+def read_vtu_points(path):
+    """Deformed point coordinates from a VTU, ordered by PointID.
+
+    CardioMechanics stores no explicit displacement field; the mesh point
+    coordinates are the deformed geometry. Sorting by PointID makes the order
+    independent of MPI partitioning. Returns (pointid, points) with points
+    shape (N, 3). Requires meshio.
+    """
+    import meshio
+
+    m = meshio.read(str(path))
+    pts = m.points
+    pid = m.point_data.get("PointID")
+    if pid is None:
+        return np.arange(len(pts)), pts
+    pid = np.asarray(pid).ravel()
+    order = np.argsort(pid, kind="stable")
+    return pid[order], pts[order]
+
+
 def write_golden(path, names, data):
     # CellModelTest writes ~7 significant figures; %.8e keeps that faithfully
     # without storing re-expansion noise, and stays well above the compare rtol.

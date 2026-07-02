@@ -5,9 +5,14 @@ runs a binary on a fixed input and compares its output to a committed reference
 with numerical tolerances (never byte-exact). See `REGRESSION_PLAN.md` for the
 full design and rollout.
 
-Status: **Phase 1 — CellModelTest** (single-cell ionic models, plus coupled
-ionic+tension runs for Land17). Phases 2–3 (CardioMechanics, BidomainMatrixGenerator,
-acCELLerate) are planned.
+Coverage so far:
+- **CellModelTest** — all runnable single-cell ionic models (auto-discovered),
+  plus coupled ionic+tension runs for Land17. Serial.
+- **CardioMechanics** — benchmark2015 Problem1 (Static solver) at `mpirun -np 4`:
+  the `Pressure.dat` time series and the final deformed geometry (last VTU point
+  coordinates, via meshio). Marked `mpi`.
+
+Planned: EM01 full electromechanical run, BidomainMatrixGenerator, acCELLerate.
 
 ## Setup
 
