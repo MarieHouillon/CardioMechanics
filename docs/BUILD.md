@@ -80,6 +80,47 @@ to create the `_build` folder and compile the code using
 cmake --build _build
 ```
 
+## Building with CMake presets (recommended)
+
+The repository ships a `CMakePresets.json` with `release` and `debug` presets. The
+presets set `kaRootDir` to the source directory automatically, so you do not need to
+export it in your shell just to build. Configure and build with:
+```
+cmake --preset release
+cmake --build --preset release
+```
+Use the `debug` preset in the same way for a debug build.
+
+Machine-specific paths (`PETSC_DIR`, `PETSC_ARCH`) are kept out of the committed presets.
+Provide them in an uncommitted `CMakeUserPresets.json` next to `CMakePresets.json` that
+inherits a base preset, for example:
+```json
+{
+  "version": 3,
+  "configurePresets": [
+    {
+      "name": "local-release",
+      "inherits": "release",
+      "cacheVariables": {
+        "PETSC_DIR": "/path/to/petsc",
+        "PETSC_ARCH": "petsc-v3.19.1"
+      }
+    }
+  ],
+  "buildPresets": [
+    { "name": "local-release", "configurePreset": "local-release" }
+  ]
+}
+```
+then build with `cmake --preset local-release` and `cmake --build --preset local-release`.
+
+Two things differ from the plain build above:
+* Preset builds place binaries in `_build/<release|debug>/bin/macosx` (or `.../linux`),
+  not `_build/bin/macosx`. Adjust the `PATH` entry accordingly.
+* The preset only sets `kaRootDir` at build time. The binaries still read `kaRootDir` at
+  runtime to locate their bundled data files, so keep the `export kaRootDir=...` line in
+  your shell configuration regardless of how you build.
+
 ## Troubleshooting
 
 If you experience the following error 
