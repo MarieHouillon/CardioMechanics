@@ -2,8 +2,7 @@
 
 Golden-file characterization tests for the CardioMechanics binaries. Each test
 runs a binary on a fixed input and compares its output to a committed reference
-with numerical tolerances (never byte-exact). See `REGRESSION_PLAN.md` for the
-full design and rollout.
+with numerical tolerances (never byte-exact).
 
 Coverage:
 - **CellModelTest** — all runnable single-cell ionic models (auto-discovered),
